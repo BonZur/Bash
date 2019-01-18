@@ -1,0 +1,94 @@
+#!/bin/sh
+# script name:'dar'
+# Author:Bartek Zuranski 07008900 Date: 19/10/2017
+# This script purpose is to archive files with following extensions: *.{pdf,PDF,doc}
+# Script takes 2 arguments, Usage:  dar source_path archive_path
+# Files witin the source directory if with the same name as file in Archive are compared with md5sum
+# before are copied, if file is different the name will be appended with "_"before its extension.
+# study references, lecture notes, research on internet, books i.e stackoverflow. Linux for dummies.
+
+red=`tput setaf 1`    # color for some funcy look of my script:)
+green=`tput setaf 2`
+blue=`tput setab 4`
+reset=`tput sgr0`
+echo "-------------------------------------------"
+echo $green`tput bold`"SCRIPT:_$0 v01 author:__napier__nr:07008900"$reset
+echo "-------------------------------------------"
+spath="$1"	# variable source path, and archive path 
+apath="$2"
+#_="$app"	# var for testing purposes 
+	if  [ ! -z "$1","$2" ] && [ $# -lt 2 ] ; then		# script double test for given arguments, if either one is missing script terminates
+		printf $green`tput bold`"Argument missing!$reset\n$red`tput bold`Usage: dar source_path archive_path\n"$reset
+		exit 1
+	fi							# test if source path is valid, if not script terminates
+	if [ ! -d $spath ]; then
+		printf "Source path $1\nDoesn't exist" 
+		exit 1	
+	fi
+	if [ ! -d "$apath" ]; then				# test if Archive path is valid, if not mkdir for Archive
+		printf "Archive directory doesn't exist,\n$green`tput bold`Creating Archive direcory..."$reset
+		mkdir  $apath 
+		printf "Archive Dir: $2 \n$green`tput bold`ready!"$reset
+	else
+		echo "Program is starting..."
+	fi
+	printf "\n-------------------------------\n$green`tput bold`Looking for .pdf files...$reset\n-------------------------------\n"
+	find "$1" -type f -name '*.pdf' -o -name '*.PDF' > pdfs	      # Creating the list of all pdf files from source directory
+	#find "$1" -type f -name "*.pdf" -exec md5sum "{}" + > mdpdf1 #................................................
+	#find "$1" -type f -name "*.PDF" -exec md5sum "{}" + > mdpdf2 # I have used this files for debuging and testing
+	#cat mdpdf1 mdpdf2 | cut -f 1 -d " " > md5pdfs                # ...............................................
+	while read p ; do					      # while loop to read from pdfs list
+		dir_path=`dirname "$p"`				      # Parsing the dir path, file name, file base_name, and file extension
+		f_name=`basename "$p"`
+		f_bname=${f_name%.*}
+		fext=${f_name##*.}
+		for f in $dir_path ; do	     				#for pdf files in the same path find matching .doc files
+			doc=$(find $dir_path -type f -name $f_bname.doc -exec basename {} \;)
+			for f in $dir_path ; do	# 'doc'is a var with list of matching .doc files,op txargs ec-n			 
+				if [ -f $doc ] ; then			# for pdfs without matching .docs, copy it from the path to archive 
+					if [ -f $2/$f_name ] ; then	# ...and if file exists in archive get md5sum of both files and compare					
+						file1_sum=$( md5sum $dir_path/$f_name | cut -d " " -f1 ) 
+						file2_sum=$( md5sum $2/$f_name | cut -d " " -f1 )
+						if [ "$file1_sum" != "$file2_sum" ] && [ "$file1_sum" != "$newf" ] ; then  
+						echo $green`tput bold`"File:$reset`tput setaf 1` $f_name$reset$green`tput bold` detected in Archive!, appending file name"$reset
+												 	# if file is different will be copied with appended name
+							cp $dir_path/$f_name $2/$f_bname"_".$fext	#	
+							newf=$(	md5sum $2/$f_name | cut -d " " -f1 )	# creating copied file checksum						
+							echo $file1_sum				  	# optional display of md5sum difference
+						 	echo $file2_sum
+							
+						fi
+					else
+						echo "Archiving file: $f_name" 			        # if file not in archive will be copied as it is
+						cp $dir_path/$f_name $2
+					fi
+				fi
+			done	
+		done 	
+	done < pdfs
+	rm pdfs		#pdfs list feed into while loop, after its done tmp file is removed, optional echo could be displayed.
+	printf "\n-------------------------------\n$green`tput bold`Looking for .doc files...$reset\n-------------------------------\n"
+	find "$1" -type f -name '*.doc' -exec md5sum "{}" + |  cut -f 1 -d " " > mddocs # for testing and debuging
+	adocs=$(find "$1" -type f -name '*.doc')  		
+	for i in $adocs ; do       	 			# look for paths to all '.doc files within source directory
+		for f in $i ; do				# for found files parse: path, file name, file baseName and Extension 
+		doc_path=`dirname "$i"`				# parsing path, file name, base name , and extension
+		d_name=`basename "$i"`
+		d_bname=${d_name%.*}
+		d_ext=${d_name##*.}
+			if [  -f $2/$d_name ] ;then 		 				# check if there is a same file in a archive 
+				file3_sum=$( md5sum $doc_path/$d_name | cut -d " " -f1 )  	# if file exists in archive get md5sum of both files and compare	
+				file4_sum=$( md5sum $2/$d_name | cut -d " " -f1 )				
+					if [ "$file3_sum" != "$file4_sum" ]; then
+						echo $green`tput bold`"File:$reset`tput setaf 1` $d_name$reset$green`tput bold` detected in Archive, md5sum difference,appending file name"$reset
+						cp $doc_path/$d_name $2/$d_bname"_".$d_ext # if file is different will be copied with appended name
+						echo $file3_sum	
+						echo $file4_sum  			# optional display of md5sum difference
+					fi	
+			else
+				echo "Archiving file: $d_name"
+				cp $doc_path/$d_name $2   				# if file not in archive will be copied as it is
+			fi
+		done
+	done
+	printf "\n-----------------------------------\n$green`tput bold`Archiving files complete, Goodbye!$reset\n-----------------------------------\n!"
